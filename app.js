@@ -456,6 +456,11 @@ function viewLevel(levelId) {
   const due = dueCount(words);
   const nw = newCount(words);
 
+  const sortedLevels = c.levels.slice().sort((a, b) => a.order - b.order);
+  const idx = sortedLevels.findIndex(lv => lv.id === l.id);
+  const prevLevel = idx > 0 ? sortedLevels[idx - 1] : null;
+  const nextLevel = idx < sortedLevels.length - 1 ? sortedLevels[idx + 1] : null;
+
   // Distribuzione per stage (visualizzazione "schedario Leitner"), unica per parola
   const labels = ['Nuove', 'Scatola 1', 'Scatola 2', 'Scatola 3'];
   const buckets = [0, 0, 0, 0];
@@ -506,6 +511,14 @@ function viewLevel(levelId) {
     <div class="list-actions">
       <a class="btn btn-secondary" href="#/add/word/${l.id}">+ Aggiungi parola</a>
       <a class="btn btn-secondary" href="#/import/${l.id}">Importa in blocco</a>
+    </div>
+    <div class="level-nav">
+      ${prevLevel
+        ? `<a class="level-nav-btn" href="#/level/${prevLevel.id}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${esc(prevLevel.name)}</span></a>`
+        : `<span class="level-nav-btn disabled"></span>`}
+      ${nextLevel
+        ? `<a class="level-nav-btn" href="#/level/${nextLevel.id}"><span>${esc(nextLevel.name)}</span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`
+        : `<span class="level-nav-btn disabled"></span>`}
     </div>
   `;
 }

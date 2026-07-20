@@ -511,6 +511,31 @@ textarea { min-height: 120px; font-family: var(--font-word); font-size: 13.5px; 
 
 .list-actions { display: flex; gap: 8px; margin: 14px 0; }
 
+.level-nav {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.level-nav-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--line);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.level-nav-btn:last-child { justify-content: flex-end; text-align: right; }
+.level-nav-btn span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.level-nav-btn.disabled { visibility: hidden; border: none; }
+
 hr.sep { border: none; border-top: 1px solid var(--line); margin: 20px 0; }
 
 .kv { display: flex; justify-content: space-between; padding: 10px 2px; font-size: 14px; border-bottom: 1px solid var(--line); }

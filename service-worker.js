@@ -1,7 +1,14 @@
 // Service worker di Kartei: mette in cache tutto il necessario al primo avvio
 // così l'app funziona completamente offline da quel momento in poi.
+//
+// IMPORTANTE PER GLI AGGIORNAMENTI FUTURI: ogni volta che pubblichi una nuova
+// versione dei file (app.js, styles.css, ecc.), incrementa il numero qui sotto
+// (v2 -> v3 -> v4...). È l'UNICO modo per far sì che Safari/iOS si accorga che
+// c'è qualcosa di nuovo da scaricare: se questo file resta identico, il telefono
+// continua a usare per sempre i file vecchi già salvati in cache, anche se sul
+// sito pubblicato i file sono già stati aggiornati.
 
-const CACHE_NAME = 'kartei-cache-v1';
+const CACHE_NAME = 'kartei-cache-v2';
 const ASSETS = [
   './',
   './index.html',
