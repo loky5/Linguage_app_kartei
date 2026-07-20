@@ -452,7 +452,7 @@ function viewLevel(levelId) {
   const found = getLevel(levelId);
   if (!found) return emptyState('Livello non trovato', 'Torna alla home.', '/home', 'Home');
   const { level: l, course: c } = found;
-  const words = wordsOfLevel(l.id).sort((a, b) => a.de.localeCompare(b.de, 'de'));
+  const words = wordsOfLevel(l.id); // ordine originale del file Excel (nessun riordino alfabetico)
   const due = dueCount(words);
   const nw = newCount(words);
 
@@ -631,14 +631,20 @@ function buildScopeWords(scopeType, scopeId) {
   return [];
 }
 
-function buildItemQueue(candidateWords, batchSize) {
-  const chosen = sample(candidateWords, batchSize);
+function buildItemQueue(chosen) {
   const queue = [];
   chosen.forEach(w => langsForWord(w).forEach(l => queue.push({ wordId: w.id, lang: l })));
   return queue;
 }
-function buildLearnQueue(scopeWords) { return buildItemQueue(scopeWords.filter(isNew), NEW_BATCH_SIZE); }
-function buildReviewQueue(scopeWords) { return buildItemQueue(scopeWords.filter(isDue), REVIEW_BATCH_SIZE); }
+// "Impara nuove" segue l'ordine originale del livello (come nel file Excel),
+// non un ordine casuale, così le parole si imparano in sequenza.
+function buildLearnQueue(scopeWords) {
+  return buildItemQueue(scopeWords.filter(isNew).slice(0, NEW_BATCH_SIZE));
+}
+// Il ripasso pesca invece a caso tra le parole dovute, per non rivedere sempre le stesse.
+function buildReviewQueue(scopeWords) {
+  return buildItemQueue(sample(scopeWords.filter(isDue), REVIEW_BATCH_SIZE));
+}
 
 function viewSessionStart(mode, scopeType, scopeId) {
   const scopeWords = buildScopeWords(scopeType, scopeId === '_' ? null : scopeId);
