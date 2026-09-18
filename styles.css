@@ -23,6 +23,7 @@
   --good: #1E7A4C;
   --bad: #C43B26;
   --en-soft: #3568C4;
+  --tab-active: var(--navy);
 
   --radius-s: 8px;
   --radius-m: 14px;
@@ -48,6 +49,7 @@
     --shadow-card: 0 1px 2px rgba(0,0,0,0.4);
     --shadow-pop: 0 8px 28px rgba(0,0,0,0.5);
     --en-soft: #8FB4E8;
+    --tab-active: #6E86FF;
     color-scheme: dark;
   }
 }
@@ -61,6 +63,7 @@ html[data-theme="dark"] {
   --ink-faint: #6A6A75;
   --line: #2E2E38;
   --en-soft: #8FB4E8;
+  --tab-active: #6E86FF;
   color-scheme: dark;
 }
 
@@ -164,9 +167,7 @@ button, input, textarea, select { font-family: inherit; }
   font-weight: 600;
   padding: 4px 0;
 }
-.tabbar a.active { color: var(--navy); }
-html[data-theme="dark"] .tabbar a.active,
-@media (prefers-color-scheme: dark) { .tabbar a.active { color: #6E86FF; } }
+.tabbar a.active { color: var(--tab-active); }
 .tabbar svg { width: 22px; height: 22px; }
 
 /* ---------------- Buttons ---------------- */
@@ -192,6 +193,32 @@ html[data-theme="dark"] .tabbar a.active,
 .btn-row { display: flex; gap: 10px; }
 .btn-row .btn { flex: 1; }
 .btn-sm { padding: 9px 14px; font-size: 13px; width: auto; }
+
+/* ---------------- Serie giornaliera ---------------- */
+.streak-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-card);
+}
+.streak-flame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+.streak-flame.lit { opacity: 1; filter: none; }
+.streak-flame span { font-size: 10.5px; font-weight: 800; color: var(--ink-soft); margin-top: 2px; }
+.streak-goal { flex: 1; min-width: 0; }
+.streak-goal-label { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 6px; }
 
 /* ---------------- Hero ---------------- */
 .hero {
@@ -306,6 +333,29 @@ html[data-theme="dark"] .tabbar a.active,
 .level-row .meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
 .level-row .chev { color: var(--ink-faint); flex-shrink: 0; }
 
+.level-row-wrap { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.level-row-wrap .level-row { flex: 1; margin-bottom: 0; min-width: 0; }
+
+/* ---------------- Gestione corsi/livelli (riordino, eliminazione) ---------------- */
+.manage-actions { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.manage-actions .icon-btn { width: 30px; height: 24px; }
+.manage-actions .icon-btn:disabled { opacity: 0.25; }
+.manage-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-m);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  box-shadow: var(--shadow-card);
+}
+.manage-row .chip { width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0; }
+.manage-row .body { flex: 1; min-width: 0; }
+.manage-row .name { font-weight: 700; font-size: 14.5px; }
+.manage-row .meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.manage-row .manage-actions { flex-direction: row; }
+
 /* ---------------- Leitner box viz (signature element) ---------------- */
 .leitner {
   background: var(--bg-elevated);
@@ -337,6 +387,8 @@ html[data-theme="dark"] .tabbar a.active,
 .word-row:last-child { border-bottom: none; }
 .word-row-main { flex: 1; min-width: 0; }
 .word-row-line { display: flex; align-items: center; gap: 6px; }
+.word-row.search-result { text-decoration: none; color: var(--ink); }
+.search-ctx { font-size: 11px; color: var(--ink-faint); margin-top: 3px; }
 .word-row .de { font-family: var(--font-word); font-weight: 700; font-size: 13.5px; }
 .word-row .en { font-family: var(--font-word); font-weight: 500; font-size: 12.5px; color: var(--en-soft); }
 .word-row .it { font-family: var(--font-word); font-size: 12px; color: var(--ink-soft); margin-top: 3px; }

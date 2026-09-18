@@ -23,6 +23,15 @@ dipendenza da Memrise: tutti i dati restano sul tuo iPhone.
   in quel momento.
 - **Tutto offline**: una volta installata, l'app non fa più alcuna richiesta
   di rete. I dati vivono nel tuo telefono.
+- **Cerca**: l'icona della lente sulla Home cerca una parola in tedesco,
+  italiano o inglese tra tutti i corsi, e porta dritto alla sua scheda di
+  modifica.
+- **Serie giornaliera e obiettivo**: la Home mostra da quanti giorni di fila
+  ti eserciti e quante risposte hai dato oggi rispetto al tuo obiettivo
+  (personalizzabile in **Impostazioni → Obiettivo giornaliero**).
+- **Gestione corsi e livelli**: in **Impostazioni → Gestisci corsi** puoi
+  riordinare o eliminare interi corsi; dentro un corso, le frecce e il
+  cestino accanto a ogni livello fanno lo stesso per i singoli livelli.
 
 Le traduzioni inglesi sono state generate automaticamente: dato che buona
 parte del vocabolario è tecnico/specialistico, vale la pena ricontrollarle

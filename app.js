@@ -16,6 +16,7 @@ const RETRY_HOURS = 4; // quando si sbaglia, si ritenta presto
 const NEW_BATCH_SIZE = 10;
 const REVIEW_BATCH_SIZE = 30;
 const CHOICES_COUNT = 4;
+const DEFAULT_DAILY_GOAL = 20;
 
 let STATE = null;
 let SESSION = null; // sessione di pratica in corso
@@ -27,6 +28,10 @@ function uid(prefix) {
 }
 
 function now() { return Date.now(); }
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function dateStr(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+function todayStr() { return dateStr(new Date()); }
 
 function esc(s) {
   if (s === null || s === undefined) return '';
@@ -91,7 +96,7 @@ function normalizeDE(s) {
     .trim();
 }
 
-function answersMatch(input, target) {
+function answersMatchOne(input, target) {
   const a = normalizeDE(input);
   const b = normalizeDE(target);
   if (!a) return false;
@@ -99,6 +104,12 @@ function answersMatch(input, target) {
   if (simplifyUmlauts(a) === simplifyUmlauts(b)) return true;
   if (b.length >= 5 && levenshtein(simplifyUmlauts(a), simplifyUmlauts(b)) <= 1) return true;
   return false;
+}
+
+// I campi possono contenere più alternative separate da virgola (es. traduzioni
+// italiane sinonime): basta indovinarne una.
+function answersMatch(input, target) {
+  return String(target || '').split(/[,;]/).some(alt => answersMatchOne(input, alt));
 }
 
 /* ---------------------------- Storage / stato ---------------------------- */
@@ -123,7 +134,9 @@ function freshProgress() {
 
 function migrateState() {
   if (!STATE.settings) STATE.settings = { theme: 'auto' };
+  if (typeof STATE.settings.dailyGoal !== 'number') STATE.settings.dailyGoal = DEFAULT_DAILY_GOAL;
   if (!STATE.meta) STATE.meta = { createdAt: now() };
+  if (!STATE.meta.activeDays) STATE.meta.activeDays = {};
   STATE.words.forEach(w => {
     if (w.progress && w.progress.de && w.progress.en) {
       // Formato bilingue precedente (v2, progressi separati): li uniamo in una
@@ -164,8 +177,8 @@ function seedFromSource() {
       ...w,
       progress: freshProgress(),
     })),
-    settings: { theme: 'auto' },
-    meta: { createdAt: now() },
+    settings: { theme: 'auto', dailyGoal: DEFAULT_DAILY_GOAL },
+    meta: { createdAt: now(), activeDays: {} },
   };
   saveState();
 }
@@ -212,6 +225,29 @@ function isNew(word) { return word.progress.stage === 0; }
 function dueCount(words) { return words.filter(isDue).length; }
 function newCount(words) { return words.filter(isNew).length; }
 function masteredCount(words) { return words.filter(w => w.progress.stage >= 6).length; }
+
+/* ---------------------------- Serie giornaliera (streak) ---------------------------- */
+
+function recordActivityToday() {
+  const t = todayStr();
+  STATE.meta.activeDays[t] = (STATE.meta.activeDays[t] || 0) + 1;
+}
+
+function todayAnswerCount() { return STATE.meta.activeDays[todayStr()] || 0; }
+
+// Giorni consecutivi con almeno una risposta, contando all'indietro da oggi
+// (o da ieri, se oggi non si è ancora esercitato: la serie non è ancora rotta).
+function currentStreak() {
+  const days = STATE.meta.activeDays || {};
+  const d = new Date();
+  if (!days[dateStr(d)]) d.setDate(d.getDate() - 1);
+  let streak = 0;
+  while (days[dateStr(d)]) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
 
 function stageBucket(stage) {
   if (stage === 0) return 'none';
@@ -278,6 +314,10 @@ function render() {
     html = viewWordForm(null, seg2);
   } else if (seg0 === 'import') {
     html = viewImport(seg1 || null);
+  } else if (seg0 === 'search') {
+    html = viewSearch();
+  } else if (seg0 === 'manage' && seg1 === 'courses') {
+    html = viewManageCourses();
   } else if (seg0 === 'settings') {
     html = viewSettings(); showTabs = true;
   } else {
@@ -313,10 +353,22 @@ function iconChevron() {
 function iconGear() {
   return `<svg viewBox="0 0 24 24" fill="none" width="20" height="20"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 13a7.97 7.97 0 000-2l2-1.5-2-3.4-2.4 1a8 8 0 00-1.7-1L15 3h-6l-.3 2.6a8 8 0 00-1.7 1l-2.4-1-2 3.4L4.6 11a7.97 7.97 0 000 2l-2 1.5 2 3.4 2.4-1a8 8 0 001.7 1L9 21h6l.3-2.6a8 8 0 001.7-1l2.4 1 2-3.4-2-1.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
 }
+function iconSearch() {
+  return `<svg viewBox="0 0 24 24" fill="none" width="20" height="20"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+}
+function iconTrash() {
+  return `<svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M4 7h16M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m2 0-1 13a2 2 0 01-2 2H8a2 2 0 01-2-2L5 7h14z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+function iconUp() {
+  return `<svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M6 15l6-6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+function iconDown() {
+  return `<svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
 
 function backRow(label, href) {
   return `<div class="back-row">
-    <a href="#${href}">${iconBack()}</a>
+    <a href="#${href}" aria-label="Torna a ${esc(label)}">${iconBack()}</a>
     <span style="font-size:13px;color:var(--ink-soft);font-weight:600">${esc(label)}</span>
   </div>`;
 }
@@ -341,6 +393,20 @@ function viewHome() {
   const allWords = STATE.words;
   const totalDue = dueCount(allWords);
   const totalNew = newCount(allWords);
+
+  const streak = currentStreak();
+  const goal = STATE.settings.dailyGoal || DEFAULT_DAILY_GOAL;
+  const done = todayAnswerCount();
+  const goalPct = Math.min(100, Math.round((done / goal) * 100));
+  const streakBar = `
+    <div class="streak-row">
+      <div class="streak-flame ${streak > 0 ? 'lit' : ''}">${streak > 0 ? '\u{1F525}' : '\u{1F9CA}'}<span>${streak} ${streak === 1 ? 'giorno' : 'giorni'}</span></div>
+      <div class="streak-goal">
+        <div class="streak-goal-label">Oggi: ${done}/${goal} risposte</div>
+        <div class="progress-track"><div class="progress-fill" style="width:${goalPct}%;background:var(--gold)"></div></div>
+      </div>
+    </div>
+  `;
 
   const hero = totalDue > 0 ? `
     <div class="hero">
@@ -385,8 +451,12 @@ function viewHome() {
   return `
     <div class="topbar" style="padding:0 0 6px">
       <div class="wordmark"><span class="mark"></span>Kartei</div>
-      <a class="icon-btn" href="#/settings">${iconGear()}</a>
+      <div style="display:flex;gap:4px">
+        <a class="icon-btn" href="#/search" aria-label="Cerca parole">${iconSearch()}</a>
+        <a class="icon-btn" href="#/settings" aria-label="Impostazioni">${iconGear()}</a>
+      </div>
     </div>
+    ${streakBar}
     ${hero}
     ${secondary}
     <div class="section-title">I tuoi corsi</div>
@@ -410,19 +480,26 @@ function viewCourse(courseId) {
   if (!c) return emptyState('Corso non trovato', 'Torna alla home.', '/home', 'Home');
   const levels = c.levels.slice().sort((a, b) => a.order - b.order);
 
-  const rows = levels.map(l => {
+  const rows = levels.map((l, i) => {
     const words = wordsOfLevel(l.id);
     const due = dueCount(words);
     const nw = newCount(words);
     const mastered = masteredCount(words);
-    return `<a class="level-row" href="#/level/${l.id}">
-      <div class="num" style="--accent:var(--${colorVar(c.color)})">${l.order}</div>
-      <div class="body">
-        <div class="name">${esc(l.name)}</div>
-        <div class="meta">${words.length} parole \u00b7 ${mastered} consolidate${due ? ` \u00b7 ${due} da ripassare` : ''}${nw ? ` \u00b7 ${nw} nuove` : ''}</div>
+    return `<div class="level-row-wrap">
+      <a class="level-row" href="#/level/${l.id}">
+        <div class="num" style="--accent:var(--${colorVar(c.color)})">${l.order}</div>
+        <div class="body">
+          <div class="name">${esc(l.name)}</div>
+          <div class="meta">${words.length} parole \u00b7 ${mastered} consolidate${due ? ` \u00b7 ${due} da ripassare` : ''}${nw ? ` \u00b7 ${nw} nuove` : ''}</div>
+        </div>
+        <div class="chev">${iconChevron()}</div>
+      </a>
+      <div class="manage-actions">
+        <button class="icon-btn" data-action="level-up" data-level-id="${l.id}" aria-label="Sposta su" ${i === 0 ? 'disabled' : ''}>${iconUp()}</button>
+        <button class="icon-btn" data-action="level-down" data-level-id="${l.id}" aria-label="Sposta gi\u00f9" ${i === levels.length - 1 ? 'disabled' : ''}>${iconDown()}</button>
+        <button class="icon-btn" data-action="level-delete" data-level-id="${l.id}" aria-label="Elimina livello ${esc(l.name)}" style="color:var(--bad)">${iconTrash()}</button>
       </div>
-      <div class="chev">${iconChevron()}</div>
-    </a>`;
+    </div>`;
   }).join('');
 
   const words = wordsOfCourse(c.id);
@@ -438,6 +515,9 @@ function viewCourse(courseId) {
     <div class="list-actions">
       <a class="btn btn-secondary" href="#/add/level/${c.id}">+ Nuovo livello</a>
     </div>
+    <button class="settings-item danger" style="margin-top:18px" data-action="course-delete" data-course-id="${c.id}">Elimina corso
+      <span class="sub">Cancella \u201c${esc(c.name)}\u201d e tutte le sue ${words.length} parole</span>
+    </button>
   `;
 }
 
@@ -489,7 +569,7 @@ function viewLevel(levelId) {
         ${hasLang(w, 'en') ? `<div class="word-row-line"><span class="en">${esc(w.en)}</span></div>` : ''}
         <div class="it">${esc(w.it)}</div>
       </div>
-      <a class="icon-btn" style="width:26px;height:26px" href="#/edit/word/${w.id}">
+      <a class="icon-btn" style="width:26px;height:26px" href="#/edit/word/${w.id}" aria-label="Modifica parola ${esc(w.de)}">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 000-3L18 6a2.1 2.1 0 00-3 0L4.5 16.5V20z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
       </a>
     </div>
@@ -635,6 +715,72 @@ function viewImport(levelId) {
   `;
 }
 
+/* ---------------------------- Vista: Cerca ---------------------------- */
+
+function searchResultsHtml(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return `<div class="empty" style="padding:30px 20px"><p>Digita per cercare tra le ${STATE.words.length} parole (tedesco, italiano o inglese).</p></div>`;
+  const matches = STATE.words.filter(w =>
+    (w.de && w.de.toLowerCase().includes(q)) ||
+    (w.it && w.it.toLowerCase().includes(q)) ||
+    (w.en && w.en.toLowerCase().includes(q))
+  ).slice(0, 100);
+  if (matches.length === 0) return `<div class="empty" style="padding:30px 20px"><p>Nessuna parola trovata per “${esc(query)}”.</p></div>`;
+  return matches.map(w => {
+    const found = getLevel(w.levelId);
+    const ctx = found ? `${esc(found.course.name)} · ${esc(found.level.name)}` : '';
+    return `<a class="word-row search-result" href="#/edit/word/${w.id}">
+      <span class="stage-dot" data-lvl="${stageBucket(w.progress.stage)}"></span>
+      <div class="word-row-main">
+        <div class="word-row-line"><span class="de">${esc(w.de)}</span></div>
+        ${hasLang(w, 'en') ? `<div class="word-row-line"><span class="en">${esc(w.en)}</span></div>` : ''}
+        <div class="it">${esc(w.it)}</div>
+        ${ctx ? `<div class="search-ctx">${ctx}</div>` : ''}
+      </div>
+    </a>`;
+  }).join('');
+}
+
+function viewSearch() {
+  return `
+    ${backRow('Home', '/home')}
+    <div class="page-title">Cerca</div>
+    <div class="page-sub">Trova una parola tra i tuoi corsi, in qualunque lingua</div>
+    <input type="text" id="searchInput" class="type-input" style="text-align:left" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Cerca in tedesco, italiano o inglese…">
+    <div class="card" style="padding:6px 10px;margin-top:16px" id="searchResults">
+      ${searchResultsHtml('')}
+    </div>
+  `;
+}
+
+/* ---------------------------- Vista: Gestisci corsi ---------------------------- */
+
+function viewManageCourses() {
+  const courses = STATE.courses.slice().sort((a, b) => a.order - b.order);
+  const rows = courses.map((c, i) => {
+    const words = wordsOfCourse(c.id);
+    return `<div class="manage-row">
+      <div class="chip accent-${c.color}" style="background:var(--accent)"></div>
+      <div class="body">
+        <div class="name">${esc(c.name)}</div>
+        <div class="meta">${words.length} parole · ${c.levels.length} livelli</div>
+      </div>
+      <div class="manage-actions">
+        <button class="icon-btn" data-action="course-up" data-course-id="${c.id}" aria-label="Sposta su" ${i === 0 ? 'disabled' : ''}>${iconUp()}</button>
+        <button class="icon-btn" data-action="course-down" data-course-id="${c.id}" aria-label="Sposta giù" ${i === courses.length - 1 ? 'disabled' : ''}>${iconDown()}</button>
+        <button class="icon-btn" data-action="course-delete" data-course-id="${c.id}" aria-label="Elimina corso ${esc(c.name)}" style="color:var(--bad)">${iconTrash()}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    ${backRow('Impostazioni', '/settings')}
+    <div class="page-title">Gestisci corsi</div>
+    <div class="page-sub">Riordina o elimina i tuoi corsi</div>
+    ${rows || emptyState('Nessun corso', 'Crea il tuo primo corso.', '/add/course', 'Crea un corso')}
+  `;
+}
+
 /* ---------------------------- Vista: Sessione (pratica) ---------------------------- */
 
 function buildScopeWords(scopeType, scopeId) {
@@ -705,7 +851,7 @@ function distractorsFor(word, field, count) {
 function renderSessionProgress() {
   const pct = Math.round((SESSION.pos / SESSION.total) * 100);
   return `<div class="session-top">
-    <a class="icon-btn" href="#/home" onclick="return confirm('Uscire dalla sessione? I progressi fatti finora restano salvati.')">
+    <a class="icon-btn" href="#/home" aria-label="Esci dalla sessione" onclick="return confirm('Uscire dalla sessione? I progressi fatti finora restano salvati.')">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
     </a>
     <div class="session-progress"><div class="session-progress-fill" style="width:${pct}%"></div></div>
@@ -780,14 +926,19 @@ function renderChoiceExercise(word, lang, accentColor) {
 }
 
 function renderTypingExercise(word, lang, accentColor) {
+  const reverse = SESSION.mode === 'review' && Math.random() < 0.3;
   if (!SESSION.exercise || SESSION.exercise.wordId !== word.id || SESSION.exercise.lang !== lang || SESSION.exercise.kind !== 'typing') {
-    SESSION.exercise = { kind: 'typing', wordId: word.id, lang, answered: false };
+    const promptField = reverse ? lang : 'it';
+    const answerField = reverse ? 'it' : lang;
+    SESSION.exercise = { kind: 'typing', wordId: word.id, lang, promptField, answerField, answered: false };
   }
+  const ex = SESSION.exercise;
+  const kicker = ex.answerField === 'it' ? 'Scrivi in italiano' : `Scrivi in ${langLabel(lang)}`;
   return `
     ${renderSessionProgress()}
-    <div class="quiz-kicker-row"><span class="quiz-kicker">Scrivi in ${langLabel(lang)}</span>${langBadge(lang)}</div>
+    <div class="quiz-kicker-row"><span class="quiz-kicker">${kicker}</span>${langBadge(lang)}</div>
     <div class="prompt-card accent-${accentColor}">
-      <div class="prompt-sub">${esc(word.it)}</div>
+      <div class="prompt-sub">${esc(word[ex.promptField])}</div>
     </div>
     <form id="typingForm">
       <input type="text" id="typingInput" class="type-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="\u2026">
@@ -802,6 +953,7 @@ function afterAnswer(correct, word, lang) {
   if (!SESSION.pendingResults[word.id]) SESSION.pendingResults[word.id] = [];
   SESSION.pendingResults[word.id].push(correct);
   if (correct) SESSION.correct++; else SESSION.wrong++;
+  recordActivityToday();
 }
 
 // Quando una parola ha esaurito le sue lingue in coda, la scatola avanza solo
@@ -880,6 +1032,17 @@ function viewSettings() {
       </select>
     </div>
 
+    <div class="section-title">Obiettivo giornaliero</div>
+    <div class="card">
+      <label class="field-label" for="goalInput">Risposte al giorno per tenere viva la serie</label>
+      <input type="number" id="goalInput" min="1" max="500" value="${STATE.settings.dailyGoal || DEFAULT_DAILY_GOAL}">
+    </div>
+
+    <div class="section-title">Corsi</div>
+    <a class="settings-item" href="#/manage/courses">Gestisci corsi
+      <span class="sub">Riordina o elimina corsi esistenti</span>
+    </a>
+
     <div class="section-title">Backup</div>
     <button class="settings-item" data-action="export-backup">Esporta backup
       <span class="sub">Salva un file con tutti i tuoi corsi e progressi</span>
@@ -897,6 +1060,57 @@ function viewSettings() {
       <span class="sub">Cancella tutto e reimporta i corsi originali del tuo Excel</span>
     </button>
   `;
+}
+
+/* ---------------------------- Gestione corsi e livelli ---------------------------- */
+
+// Scambia l'ordine con il vicino (sopra o sotto) in base alla posizione ordinata attuale.
+function swapOrder(sortedList, id, dir) {
+  const idx = sortedList.findIndex(x => x.id === id);
+  const swapIdx = idx + dir;
+  if (idx < 0 || swapIdx < 0 || swapIdx >= sortedList.length) return;
+  const a = sortedList[idx], b = sortedList[swapIdx];
+  const tmp = a.order; a.order = b.order; b.order = tmp;
+}
+
+function moveCourse(courseId, dir) {
+  const sorted = STATE.courses.slice().sort((a, b) => a.order - b.order);
+  swapOrder(sorted, courseId, dir);
+  saveState();
+  render();
+}
+
+function moveLevel(levelId, dir) {
+  const found = getLevel(levelId);
+  if (!found) return;
+  const sorted = found.course.levels.slice().sort((a, b) => a.order - b.order);
+  swapOrder(sorted, levelId, dir);
+  saveState();
+  render();
+}
+
+function deleteCourse(courseId) {
+  const c = getCourse(courseId);
+  if (!c) return;
+  const words = wordsOfCourse(courseId);
+  if (!confirm(`Eliminare il corso “${c.name}” e tutte le sue ${words.length} parole? Questa azione non si può annullare.`)) return;
+  STATE.courses = STATE.courses.filter(x => x.id !== courseId);
+  STATE.words = STATE.words.filter(w => w.courseId !== courseId);
+  saveState();
+  toast('Corso eliminato');
+  nav('/home');
+}
+
+function deleteLevel(levelId) {
+  const found = getLevel(levelId);
+  if (!found) return;
+  const words = wordsOfLevel(levelId);
+  if (!confirm(`Eliminare il livello “${found.level.name}” e tutte le sue ${words.length} parole? Questa azione non si può annullare.`)) return;
+  found.course.levels = found.course.levels.filter(l => l.id !== levelId);
+  STATE.words = STATE.words.filter(w => w.levelId !== levelId);
+  saveState();
+  toast('Livello eliminato');
+  nav('/course/' + found.course.id);
 }
 
 /* ---------------------------- Gestione eventi ---------------------------- */
@@ -1061,10 +1275,11 @@ function attachHandlers(parts) {
       if (SESSION.exercise.answered) return;
       SESSION.exercise.answered = true;
       const { word, lang } = currentSessionItem();
-      const correct = answersMatch(input.value, word[lang]);
+      const answerField = SESSION.exercise.answerField;
+      const correct = answersMatch(input.value, word[answerField]);
       input.disabled = true;
       const fb = document.getElementById('typingFeedback');
-      fb.innerHTML = `<div class="type-feedback ${correct ? 'good' : 'bad'}">${correct ? 'Esatto!' : 'Non proprio.'}${!correct ? `<span class="answer">${esc(word[lang])}</span>` : ''}</div>`;
+      fb.innerHTML = `<div class="type-feedback ${correct ? 'good' : 'bad'}">${correct ? 'Esatto!' : 'Non proprio.'}${!correct ? `<span class="answer">${esc(word[answerField])}</span>` : ''}</div>`;
       afterAnswer(correct, word, lang);
       goNextStep(correct ? 750 : 1700, word);
     });
@@ -1078,6 +1293,33 @@ function attachHandlers(parts) {
     applyTheme();
     toast('Tema aggiornato');
   });
+
+  const goalInput = document.getElementById('goalInput');
+  if (goalInput) goalInput.addEventListener('change', () => {
+    const v = parseInt(goalInput.value, 10);
+    STATE.settings.dailyGoal = (v > 0) ? v : DEFAULT_DAILY_GOAL;
+    saveState();
+    toast('Obiettivo aggiornato');
+  });
+
+  // gestione corsi (riordino/eliminazione)
+  app.querySelectorAll('[data-action="course-up"]').forEach(b => b.addEventListener('click', () => moveCourse(b.dataset.courseId, -1)));
+  app.querySelectorAll('[data-action="course-down"]').forEach(b => b.addEventListener('click', () => moveCourse(b.dataset.courseId, 1)));
+  app.querySelectorAll('[data-action="course-delete"]').forEach(b => b.addEventListener('click', () => deleteCourse(b.dataset.courseId)));
+
+  // gestione livelli (riordino/eliminazione)
+  app.querySelectorAll('[data-action="level-up"]').forEach(b => b.addEventListener('click', () => moveLevel(b.dataset.levelId, -1)));
+  app.querySelectorAll('[data-action="level-down"]').forEach(b => b.addEventListener('click', () => moveLevel(b.dataset.levelId, 1)));
+  app.querySelectorAll('[data-action="level-delete"]').forEach(b => b.addEventListener('click', () => deleteLevel(b.dataset.levelId)));
+
+  // ricerca (filtro live, senza cambiare rotta a ogni carattere)
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.focus();
+    searchInput.addEventListener('input', () => {
+      document.getElementById('searchResults').innerHTML = searchResultsHtml(searchInput.value);
+    });
+  }
 
   const exportBtn = app.querySelector('[data-action="export-backup"]');
   if (exportBtn) exportBtn.addEventListener('click', () => {
