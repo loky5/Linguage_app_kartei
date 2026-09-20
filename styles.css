@@ -19,6 +19,8 @@
   --gold: #C68400;
   --teal: #0F766E;
   --violet: #6231B0;
+  --green: #2E7D32;
+  --pink: #C2185B;
 
   --good: #1E7A4C;
   --bad: #C43B26;
@@ -72,6 +74,8 @@ html[data-theme="dark"] {
 .accent-gold   { --accent: var(--gold); }
 .accent-teal   { --accent: var(--teal); }
 .accent-violet { --accent: var(--violet); }
+.accent-green  { --accent: var(--green); }
+.accent-pink   { --accent: var(--pink); }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 

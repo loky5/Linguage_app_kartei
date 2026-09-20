@@ -93,8 +93,14 @@ function normalizeDE(s) {
     .replace(/\+\s*(akk|dat|gen)\b/g, '')
     .replace(/[.,;:!?()]/g, '')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .replace(/^to /, '')
+    .replace(/ \d+$/, '');
 }
+
+// Chiave per riconoscere la stessa parola tra versioni diverse dei dati
+// (ignora maiuscole, "|", indicazioni +akk/dat/gen e il numero finale 1/2/3).
+function wordKey(de) { return normalizeDE(String(de || '')); }
 
 function answersMatchOne(input, target) {
   const a = normalizeDE(input);
@@ -167,6 +173,67 @@ function migrateState() {
     if (typeof w.progress.correctCount !== 'number') w.progress.correctCount = 0;
     if (typeof w.progress.wrongCount !== 'number') w.progress.wrongCount = 0;
   });
+  upgradeSeedIfNeeded();
+}
+
+const SEED_VERSION = (typeof SEED_DATA !== 'undefined' && SEED_DATA.version) || 1;
+const isSeedCourseId = id => /^(s\d+|c\d+-tedesco-.+)$/.test(id);
+
+// Quando i dati originali (Excel) vengono aggiornati, i corsi e le parole originali
+// vengono sostituiti dalla nuova versione. I progressi restano: ogni parola nuova
+// eredita quelli della stessa parola tedesca presente prima. Le parole, i livelli e i
+// corsi creati a mano nell'app vengono conservati.
+function upgradeSeedIfNeeded() {
+  if (typeof SEED_DATA === 'undefined' || (STATE.meta.seedVersion || 1) >= SEED_VERSION) return;
+
+  const oldCourses = STATE.courses, oldWords = STATE.words;
+  const oldLevelInfo = new Map();
+  oldCourses.forEach(c => c.levels.forEach(l => oldLevelInfo.set(l.id, { course: c, level: l })));
+  const isSeedWord = w => isSeedCourseId(w.courseId) && /^(w\d+|s\d+-l\d+-\d+)$/.test(w.id);
+
+  const progressByKey = new Map();
+  oldWords.filter(isSeedWord).forEach(w => {
+    const k = wordKey(w.de), prev = progressByKey.get(k);
+    if (!prev || w.progress.stage > prev.stage) progressByKey.set(k, w.progress);
+  });
+
+  const seed = JSON.parse(JSON.stringify(SEED_DATA));
+  const newWords = seed.words.map(w => {
+    const p = progressByKey.get(wordKey(w.de));
+    return { ...w, progress: p ? { ...p } : freshProgress() };
+  });
+
+  const customCourses = oldCourses.filter(c => !isSeedCourseId(c.id));
+  const newCourseBySource = new Map(seed.courses.map(c => [c.sourceName, c]));
+  const customWords = [];
+
+  // livelli creati a mano dentro corsi originali: si agganciano al corso con lo stesso foglio
+  oldCourses.filter(c => isSeedCourseId(c.id)).forEach(oc => {
+    const nc = newCourseBySource.get(oc.sourceName);
+    if (!nc) return;
+    oc.levels.filter(l => !/^(l\d+|c\d+-.+-liv\d+|s\d+-l\d+)$/.test(l.id)).forEach(l => {
+      nc.levels.push({ ...l, order: nc.levels.reduce((m, x) => Math.max(m, x.order), 0) + 1 });
+      oldWords.filter(w => w.levelId === l.id).forEach(w => customWords.push({ ...w, courseId: nc.id }));
+    });
+  });
+
+  // parole aggiunte a mano dentro un livello originale: stesso foglio e stesso nome di livello
+  oldWords.filter(w => !isSeedWord(w) && isSeedCourseId(w.courseId)).forEach(w => {
+    const info = oldLevelInfo.get(w.levelId);
+    if (!info || customWords.some(x => x.id === w.id)) return;
+    const nc = newCourseBySource.get(info.course.sourceName);
+    const nl = nc && nc.levels.find(l => l.name === info.level.name);
+    if (nl) customWords.push({ ...w, courseId: nc.id, levelId: nl.id });
+  });
+
+  // corsi creati a mano (con i loro livelli e parole)
+  const customCourseWords = oldWords.filter(w => customCourses.some(c => c.id === w.courseId));
+  const baseOrder = seed.courses.length;
+  customCourses.forEach((c, i) => { c.order = baseOrder + i + 1; });
+
+  STATE.courses = seed.courses.concat(customCourses);
+  STATE.words = newWords.concat(customWords, customCourseWords);
+  STATE.meta.seedVersion = SEED_VERSION;
 }
 
 function seedFromSource() {
@@ -178,7 +245,7 @@ function seedFromSource() {
       progress: freshProgress(),
     })),
     settings: { theme: 'auto', dailyGoal: DEFAULT_DAILY_GOAL },
-    meta: { createdAt: now(), activeDays: {} },
+    meta: { createdAt: now(), activeDays: {}, seedVersion: SEED_VERSION },
   };
   saveState();
 }
@@ -487,7 +554,7 @@ function viewCourse(courseId) {
     const mastered = masteredCount(words);
     return `<div class="level-row-wrap">
       <a class="level-row" href="#/level/${l.id}">
-        <div class="num" style="--accent:var(--${colorVar(c.color)})">${l.order}</div>
+        <div class="num" style="--accent:var(--${colorVar(c.color)})">${levelNum(l)}</div>
         <div class="body">
           <div class="name">${esc(l.name)}</div>
           <div class="meta">${words.length} parole \u00b7 ${mastered} consolidate${due ? ` \u00b7 ${due} da ripassare` : ''}${nw ? ` \u00b7 ${nw} nuove` : ''}</div>
@@ -522,8 +589,14 @@ function viewCourse(courseId) {
 }
 
 function colorVar(color) {
-  const map = { blue: 'blue', red: 'red', gold: 'gold', teal: 'teal', violet: 'violet' };
+  const map = { blue: 'blue', red: 'red', gold: 'gold', teal: 'teal', violet: 'violet', green: 'green', pink: 'pink' };
   return map[color] || 'navy';
+}
+
+// Numero mostrato nel riquadro del livello: quello scritto nel nome (come nel file Excel).
+function levelNum(l) {
+  const m = /\d+/.exec(l.name || '');
+  return m ? m[0] : l.order;
 }
 
 /* ---------------------------- Vista: Livello ---------------------------- */
@@ -626,7 +699,7 @@ function viewAddMenu() {
 }
 
 function viewCourseForm() {
-  const colors = ['blue', 'red', 'gold', 'teal', 'violet'];
+  const colors = ['blue', 'red', 'gold', 'teal', 'violet', 'green', 'pink'];
   return `
     ${backRow('Aggiungi', '/add')}
     <div class="page-title">Nuovo corso</div>

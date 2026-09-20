@@ -1,16 +1,17 @@
 # Kartei — le tue parole
 
 Un'app web offline per imparare vocabolario con la ripetizione dilazionata,
-costruita a partire dai tuoi corsi Excel (2.327 parole già importate, in 5
-corsi tedeschi con i loro livelli). Nessun account, nessun server, nessuna
+costruita a partire dal tuo file Excel "parole memrise ted-eng-ita" (3.436
+parole già importate, in 7 corsi tedeschi con i loro livelli, nello stesso
+ordine del file). Nessun account, nessun server, nessuna
 dipendenza da Memrise: tutti i dati restano sul tuo iPhone.
 
 ## Come funziona
 
 - **Corsi e livelli**: come nel tuo Excel, ogni corso ha più livelli di parole.
 - **Tedesco e inglese insieme**: ogni parola ha traduzioni sia in tedesco sia
-  in inglese (le 2.327 parole del tuo Excel sono già state tradotte in
-  inglese). Ogni parola ha **un'unica "scatola" Leitner**, ma per farla
+  in inglese (tutte le parole del tuo Excel hanno la traduzione inglese,
+  scelta a partire dal tedesco). Ogni parola ha **un'unica "scatola" Leitner**, ma per farla
   avanzare devi rispondere correttamente **sia in tedesco sia in inglese**
   nella stessa sessione: se sbagli anche solo una delle due, la scatola
   retrocede, così impari davvero entrambe in parallelo.
@@ -36,6 +37,15 @@ dipendenza da Memrise: tutti i dati restano sul tuo iPhone.
 Le traduzioni inglesi sono state generate automaticamente: dato che buona
 parte del vocabolario è tecnico/specialistico, vale la pena ricontrollarle
 con calma (puoi correggerle direttamente nell'app, in **Modifica parola**).
+
+Nella scrittura basta digitare la parola senza il numero finale (per
+"die Feder 1" va bene "die Feder") e, per i verbi inglesi, senza "to".
+
+**Aggiornamento dei dati dall'Excel**: quando i dati originali vengono
+aggiornati (nuovi corsi, livelli o parole), all'apertura successiva l'app li
+sostituisce con la nuova versione. I progressi si conservano: ogni parola
+riconosciuta (stessa parola tedesca) mantiene la sua scatola. Restano anche
+i corsi, i livelli e le parole che hai creato tu nell'app.
 
 ## 1. Provarla subito sul computer
 
@@ -106,7 +116,7 @@ kartei/
 ├── app.js                logica dell'app (dati, algoritmo, schermate)
 ├── manifest.json          configurazione PWA (nome, icone, colori)
 ├── service-worker.js       cache offline
-├── data/seed-data.js        le tue 2.327 parole originali, importate dall'Excel
+├── data/seed-data.js        le tue 3.436 parole originali, importate dall'Excel
 └── icons/                    icone dell'app
 ```
 
