@@ -43,7 +43,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #131318;
     --bg-elevated: #1C1C24;
     --ink: #F1F1EF;
