@@ -648,8 +648,8 @@ function viewLevel(levelId) {
     </div>
   </div>`;
 
-  const wordRows = words.map(w => `
-    <div class="word-row">
+  const wordRows = words.map((w, wi) => `
+    <div class="word-row" data-word-id="${w.id}">
       <span class="stage-dot" data-lvl="${stageBucket(w.progress.stage)}"></span>
       <div class="word-row-main">
         ${hasLang(w, 'de')
@@ -657,6 +657,10 @@ function viewLevel(levelId) {
         ${hasLang(w, 'en') ? `<div class="word-row-line"><span class="en">${esc(w.en)}</span></div>` : ''}`
           : `<div class="word-row-line"><span class="de">${esc(w.en)}</span></div>`}
         <div class="it">${esc(w.it)}</div>
+      </div>
+      <div class="word-move">
+        <button class="icon-btn" data-action="word-up" data-word-id="${w.id}" aria-label="Sposta su" ${wi === 0 ? 'disabled' : ''}>${iconUp()}</button>
+        <button class="icon-btn" data-action="word-down" data-word-id="${w.id}" aria-label="Sposta giù" ${wi === words.length - 1 ? 'disabled' : ''}>${iconDown()}</button>
       </div>
       <a class="icon-btn" style="width:26px;height:26px" href="#/edit/word/${w.id}" aria-label="Modifica parola ${esc(w.de || w.en)}">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 000-3L18 6a2.1 2.1 0 00-3 0L4.5 16.5V20z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
@@ -758,6 +762,9 @@ function viewWordForm(levelIdForNew, wordIdForEdit) {
   const found = getLevel(levelId);
   if (!found) return emptyState('Livello non trovato', '', '/home', 'Home');
   const { level: l, course: c } = found;
+  const levelWords = wordsOfLevel(l.id);
+  const totalPos = levelWords.length + (isEdit ? 0 : 1);
+  const currentPos = isEdit ? levelWords.findIndex(w => w.id === word.id) + 1 : totalPos;
 
   return `
     ${backRow(l.name, '/level/' + l.id)}
@@ -774,6 +781,8 @@ function viewWordForm(levelIdForNew, wordIdForEdit) {
         <input type="text" id="wen" value="${esc(isEdit && word.en ? word.en : '')}" required>`
           : `<label class="field-label" for="wen">Inglese <span style="font-weight:500;color:var(--ink-faint)">(lascia vuoto se non lo sai ancora)</span></label>
         <input type="text" id="wen" value="${esc(isEdit && word.en ? word.en : '')}">`}
+        <label class="field-label" for="wpos">Posizione nel livello <span style="font-weight:500;color:var(--ink-faint)">(1 = in cima, ${totalPos} = in fondo)</span></label>
+        <input type="number" id="wpos" min="1" max="${totalPos}" value="${currentPos}" inputmode="numeric">
       </div>
       <button class="btn btn-primary" type="submit">${isEdit ? 'Salva modifiche' : 'Aggiungi parola'}</button>
       ${isEdit ? `<button type="button" class="btn btn-danger" style="margin-top:10px" data-action="delete-word" data-word-id="${word.id}">Elimina parola</button>` : ''}
@@ -1182,6 +1191,36 @@ function moveCourse(courseId, dir) {
   render();
 }
 
+// Riordino delle parole dentro un livello: le parole del livello mantengono gli stessi
+// "posti" nell'elenco generale, cambia solo l'ordine tra loro.
+function moveWordTo(wordId, newIndex) {
+  const w = STATE.words.find(x => x.id === wordId);
+  if (!w) return;
+  const slots = [];
+  STATE.words.forEach((x, i) => { if (x.levelId === w.levelId) slots.push(i); });
+  const list = slots.map(i => STATE.words[i]).filter(x => x.id !== wordId);
+  list.splice(Math.max(0, Math.min(newIndex, list.length)), 0, w);
+  slots.forEach((slot, k) => { STATE.words[slot] = list[k]; });
+}
+
+function moveWord(wordId, dir) {
+  const w = STATE.words.find(x => x.id === wordId);
+  if (!w) return;
+  const list = wordsOfLevel(w.levelId);
+  const target = list.findIndex(x => x.id === wordId) + dir;
+  if (target < 0 || target >= list.length) return;
+  moveWordTo(wordId, target);
+  saveState();
+  render();
+  // la parola spostata resta in vista, così si può continuare a spostarla
+  const row = document.querySelector(`.word-row[data-word-id="${wordId}"]`);
+  if (row) {
+    row.scrollIntoView({ block: 'center' });
+    row.classList.add('just-moved');
+    setTimeout(() => row.classList.remove('just-moved'), 900);
+  }
+}
+
 function moveLevel(levelId, dir) {
   const found = getLevel(levelId);
   if (!found) return;
@@ -1272,9 +1311,12 @@ function attachHandlers(parts) {
     const en = document.getElementById('wen').value.trim();
     if ((!enOnly && !de) || !it || (enOnly && !en)) return;
     const wordId = wordForm.dataset.wordId;
+    const posInput = document.getElementById('wpos');
+    const wantedPos = posInput ? parseInt(posInput.value, 10) : NaN;
     if (wordId) {
       const w = STATE.words.find(x => x.id === wordId);
       w.de = de; w.it = it; w.en = en || null;
+      if (wantedPos > 0) moveWordTo(w.id, wantedPos - 1);
       saveState();
       toast('Parola aggiornata');
       nav('/level/' + w.levelId);
@@ -1283,6 +1325,7 @@ function attachHandlers(parts) {
       const found = getLevel(levelId);
       const w = { id: uid('w'), courseId: found.course.id, levelId, de, it, en: en || null, progress: freshProgress() };
       STATE.words.push(w);
+      if (wantedPos > 0) moveWordTo(w.id, wantedPos - 1);
       saveState();
       toast('Parola aggiunta');
       nav('/level/' + levelId);
@@ -1421,6 +1464,10 @@ function attachHandlers(parts) {
   app.querySelectorAll('[data-action="course-up"]').forEach(b => b.addEventListener('click', () => moveCourse(b.dataset.courseId, -1)));
   app.querySelectorAll('[data-action="course-down"]').forEach(b => b.addEventListener('click', () => moveCourse(b.dataset.courseId, 1)));
   app.querySelectorAll('[data-action="course-delete"]').forEach(b => b.addEventListener('click', () => deleteCourse(b.dataset.courseId)));
+
+  // riordino delle parole nel livello
+  app.querySelectorAll('[data-action="word-up"]').forEach(b => b.addEventListener('click', () => moveWord(b.dataset.wordId, -1)));
+  app.querySelectorAll('[data-action="word-down"]').forEach(b => b.addEventListener('click', () => moveWord(b.dataset.wordId, 1)));
 
   // gestione livelli (riordino/eliminazione)
   app.querySelectorAll('[data-action="level-up"]').forEach(b => b.addEventListener('click', () => moveLevel(b.dataset.levelId, -1)));

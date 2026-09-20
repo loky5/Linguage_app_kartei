@@ -625,3 +625,20 @@ a { color: var(--navy); }
   .prompt-word { font-size: 22px; }
   .hero-num { font-size: 40px; }
 }
+
+/* ---------------- Riordino parole ---------------- */
+.word-move { display: flex; flex-direction: column; gap: 0; flex-shrink: 0; }
+.word-move .icon-btn { width: 30px; height: 20px; }
+.word-move .icon-btn:disabled { opacity: 0.25; }
+.word-row { transition: background 0.4s ease; }
+.word-row.just-moved { background: color-mix(in srgb, var(--accent, var(--navy)) 14%, transparent); }
+input[type="number"] {
+  width: 100%;
+  border: 1.5px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: var(--radius-s);
+  padding: 12px 12px;
+  font-size: 15px;
+}
+input[type="number"]:focus { outline: 2px solid var(--navy); outline-offset: 1px; }

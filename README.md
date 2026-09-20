@@ -37,6 +37,10 @@ dipendenza da Memrise: tutti i dati restano sul tuo iPhone.
 - **Serie giornaliera e obiettivo**: la Home mostra da quanti giorni di fila
   ti eserciti e quante risposte hai dato oggi rispetto al tuo obiettivo
   (personalizzabile in **Impostazioni → Obiettivo giornaliero**).
+- **Ordine delle parole**: in un livello, le frecce su/giù accanto a ogni
+  parola la spostano nell'elenco; nei moduli "Nuova parola" e "Modifica
+  parola" il campo "Posizione nel livello" la mette dove vuoi (1 = in cima).
+  L'ordine è anche quello in cui "Impara nuove" propone le parole.
 - **Gestione corsi e livelli**: in **Impostazioni → Gestisci corsi** puoi
   riordinare o eliminare interi corsi; dentro un corso, le frecce e il
   cestino accanto a ogni livello fanno lo stesso per i singoli livelli.
