@@ -3,7 +3,9 @@
 Un'app web offline per imparare vocabolario con la ripetizione dilazionata,
 costruita a partire dal tuo file Excel "parole memrise ted-eng-ita" (3.461
 parole già importate, in 8 corsi tedeschi con i loro livelli, nello stesso
-ordine del file). Nessun account, nessun server, nessuna
+ordine del file) più un corso iniziale "Inglese — Base" con 150 parole
+essenziali (75 verbi e 75 sostantivi, solo inglese-italiano, in 10 livelli).
+Nessun account, nessun server, nessuna
 dipendenza da Memrise: tutti i dati restano sul tuo iPhone.
 
 ## Come funziona
@@ -15,6 +17,9 @@ dipendenza da Memrise: tutti i dati restano sul tuo iPhone.
   avanzare devi rispondere correttamente **sia in tedesco sia in inglese**
   nella stessa sessione: se sbagli anche solo una delle due, la scatola
   retrocede, così impari davvero entrambe in parallelo.
+  Nei corsi "solo inglese" (come "Inglese — Base") non c'è il tedesco: la
+  parola avanza quando rispondi giusto in inglese, sia scrivendo dall'italiano
+  sia riconoscendo il significato.
 - **Ripetizione dilazionata**: ogni parola ha una scatola (1-8, ispirata al
   metodo Leitner). Avanza → la rivedi più in là nel tempo (ore → giorni →
   settimane → mesi). Retrocede → la rivedi presto.
@@ -116,7 +121,7 @@ kartei/
 ├── app.js                logica dell'app (dati, algoritmo, schermate)
 ├── manifest.json          configurazione PWA (nome, icone, colori)
 ├── service-worker.js       cache offline
-├── data/seed-data.js        le tue 3.461 parole originali, importate dall'Excel
+├── data/seed-data.js        le tue 3.461 parole dell'Excel + le 150 del corso base
 └── icons/                    icone dell'app
 ```
 

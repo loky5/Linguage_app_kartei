@@ -83,7 +83,8 @@ function levenshtein(a, b) {
 function simplifyUmlauts(s) {
   return s.replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
     .replace(/Ä/g, 'ae').replace(/Ö/g, 'oe').replace(/Ü/g, 'ue')
-    .replace(/ß/g, 'ss');
+    .replace(/ß/g, 'ss')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
 function normalizeDE(s) {
@@ -177,7 +178,8 @@ function migrateState() {
 }
 
 const SEED_VERSION = (typeof SEED_DATA !== 'undefined' && SEED_DATA.version) || 1;
-const isSeedCourseId = id => /^(s\d+|c\d+-tedesco-.+)$/.test(id);
+const isSeedCourseId = id => /^([se]\d+|c\d+-tedesco-.+)$/.test(id);
+const progressKey = w => (hasLang(w, 'de') ? wordKey(w.de) : 'en:' + wordKey(w.en));
 
 // Quando i dati originali (Excel) vengono aggiornati, i corsi e le parole originali
 // vengono sostituiti dalla nuova versione. I progressi restano: ogni parola nuova
@@ -189,17 +191,17 @@ function upgradeSeedIfNeeded() {
   const oldCourses = STATE.courses, oldWords = STATE.words;
   const oldLevelInfo = new Map();
   oldCourses.forEach(c => c.levels.forEach(l => oldLevelInfo.set(l.id, { course: c, level: l })));
-  const isSeedWord = w => isSeedCourseId(w.courseId) && /^(w\d+|s\d+-l\d+-\d+)$/.test(w.id);
+  const isSeedWord = w => isSeedCourseId(w.courseId) && /^(w\d+|[se]\d+-l\d+-\d+)$/.test(w.id);
 
   const progressByKey = new Map();
   oldWords.filter(isSeedWord).forEach(w => {
-    const k = wordKey(w.de), prev = progressByKey.get(k);
+    const k = progressKey(w), prev = progressByKey.get(k);
     if (!prev || w.progress.stage > prev.stage) progressByKey.set(k, w.progress);
   });
 
   const seed = JSON.parse(JSON.stringify(SEED_DATA));
   const newWords = seed.words.map(w => {
-    const p = progressByKey.get(wordKey(w.de));
+    const p = progressByKey.get(progressKey(w));
     return { ...w, progress: p ? { ...p } : freshProgress() };
   });
 
@@ -211,7 +213,7 @@ function upgradeSeedIfNeeded() {
   oldCourses.filter(c => isSeedCourseId(c.id)).forEach(oc => {
     const nc = newCourseBySource.get(oc.sourceName);
     if (!nc) return;
-    oc.levels.filter(l => !/^(l\d+|c\d+-.+-liv\d+|s\d+-l\d+)$/.test(l.id)).forEach(l => {
+    oc.levels.filter(l => !/^(l\d+|c\d+-.+-liv\d+|[se]\d+-l\d+)$/.test(l.id)).forEach(l => {
       nc.levels.push({ ...l, order: nc.levels.reduce((m, x) => Math.max(m, x.order), 0) + 1 });
       oldWords.filter(w => w.levelId === l.id).forEach(w => customWords.push({ ...w, courseId: nc.id }));
     });
@@ -277,11 +279,17 @@ const LANGS = ['de', 'en'];
 function langLabel(lang) { return lang === 'de' ? 'tedesco' : 'inglese'; }
 function langLabelShort(lang) { return lang === 'de' ? 'DE' : 'EN'; }
 
-// L'inglese è "attivo" per una parola solo se è stato compilato (testo non vuoto).
-function hasLang(word, lang) { return lang === 'de' ? true : !!(word.en && word.en.trim()); }
+// Una lingua è "attiva" per una parola solo se è stata compilata (testo non vuoto).
+// Le parole dei corsi "solo inglese" non hanno il tedesco.
+function hasLang(word, lang) { return !!(word[lang] && String(word[lang]).trim()); }
 
-// Le lingue da esercitare per una parola, in ordine casuale (tedesco sempre presente).
-function langsForWord(word) { return hasLang(word, 'en') ? shuffle(['de', 'en']) : ['de']; }
+// Le lingue da esercitare per una parola, in ordine casuale.
+function langsForWord(word) {
+  const langs = LANGS.filter(l => hasLang(word, l));
+  return shuffle(langs.length ? langs : ['de']);
+}
+
+function isEnOnlyCourse(course) { return !!(course && course.enOnly); }
 
 function isDue(word) {
   const p = word.progress;
@@ -589,7 +597,7 @@ function viewCourse(courseId) {
 }
 
 function colorVar(color) {
-  const map = { blue: 'blue', red: 'red', gold: 'gold', teal: 'teal', violet: 'violet', green: 'green', pink: 'pink', orange: 'orange' };
+  const map = { blue: 'blue', red: 'red', gold: 'gold', teal: 'teal', violet: 'violet', green: 'green', pink: 'pink', orange: 'orange', sky: 'sky' };
   return map[color] || 'navy';
 }
 
@@ -638,11 +646,13 @@ function viewLevel(levelId) {
     <div class="word-row">
       <span class="stage-dot" data-lvl="${stageBucket(w.progress.stage)}"></span>
       <div class="word-row-main">
-        <div class="word-row-line"><span class="de">${esc(w.de)}</span></div>
-        ${hasLang(w, 'en') ? `<div class="word-row-line"><span class="en">${esc(w.en)}</span></div>` : ''}
+        ${hasLang(w, 'de')
+          ? `<div class="word-row-line"><span class="de">${esc(w.de)}</span></div>
+        ${hasLang(w, 'en') ? `<div class="word-row-line"><span class="en">${esc(w.en)}</span></div>` : ''}`
+          : `<div class="word-row-line"><span class="de">${esc(w.en)}</span></div>`}
         <div class="it">${esc(w.it)}</div>
       </div>
-      <a class="icon-btn" style="width:26px;height:26px" href="#/edit/word/${w.id}" aria-label="Modifica parola ${esc(w.de)}">
+      <a class="icon-btn" style="width:26px;height:26px" href="#/edit/word/${w.id}" aria-label="Modifica parola ${esc(w.de || w.en)}">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 000-3L18 6a2.1 2.1 0 00-3 0L4.5 16.5V20z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
       </a>
     </div>
@@ -651,7 +661,7 @@ function viewLevel(levelId) {
   return `
     ${backRow(c.name, '/course/' + c.id)}
     <div class="page-title">${esc(l.name)}</div>
-    <div class="page-sub">${words.length} parole \u00b7 ogni parola avanza solo se sai sia il tedesco sia l'inglese</div>
+    <div class="page-sub">${words.length} parole \u00b7 ${isEnOnlyCourse(c) ? 'ogni parola avanza quando sai l\u2019inglese' : 'ogni parola avanza solo se sai sia il tedesco sia l\u2019inglese'}</div>
     ${leitner}
     <div class="btn-row" style="margin-bottom:22px">
       <button class="btn btn-primary" data-action="start-learn" data-scope-type="level" data-scope-id="${l.id}" ${nw === 0 ? 'disabled' : ''}>Impara nuove (${nw})</button>
@@ -699,7 +709,7 @@ function viewAddMenu() {
 }
 
 function viewCourseForm() {
-  const colors = ['blue', 'red', 'gold', 'teal', 'violet', 'green', 'pink', 'orange'];
+  const colors = ['blue', 'red', 'gold', 'teal', 'violet', 'green', 'pink', 'orange', 'sky'];
   return `
     ${backRow('Aggiungi', '/add')}
     <div class="page-title">Nuovo corso</div>
@@ -747,14 +757,17 @@ function viewWordForm(levelIdForNew, wordIdForEdit) {
     ${backRow(l.name, '/level/' + l.id)}
     <div class="page-title">${isEdit ? 'Modifica parola' : 'Nuova parola'}</div>
     <div class="page-sub">${esc(c.name)} \u2014 ${esc(l.name)}</div>
-    <form id="wordForm" data-level-id="${l.id}" ${isEdit ? `data-word-id="${word.id}"` : ''}>
+    <form id="wordForm" data-level-id="${l.id}" ${isEdit ? `data-word-id="${word.id}"` : ''} ${isEnOnlyCourse(c) ? 'data-en-only="1"' : ''}>
       <div class="card">
-        <label class="field-label" for="wde">Tedesco</label>
-        <input type="text" id="wde" value="${esc(isEdit ? word.de : '')}" required>
+        ${isEnOnlyCourse(c) ? '' : `<label class="field-label" for="wde">Tedesco</label>
+        <input type="text" id="wde" value="${esc(isEdit ? word.de : '')}" required>`}
         <label class="field-label" for="wit">Italiano</label>
         <input type="text" id="wit" value="${esc(isEdit ? word.it : '')}" required>
-        <label class="field-label" for="wen">Inglese <span style="font-weight:500;color:var(--ink-faint)">(lascia vuoto se non lo sai ancora)</span></label>
-        <input type="text" id="wen" value="${esc(isEdit && word.en ? word.en : '')}">
+        ${isEnOnlyCourse(c)
+          ? `<label class="field-label" for="wen">Inglese</label>
+        <input type="text" id="wen" value="${esc(isEdit && word.en ? word.en : '')}" required>`
+          : `<label class="field-label" for="wen">Inglese <span style="font-weight:500;color:var(--ink-faint)">(lascia vuoto se non lo sai ancora)</span></label>
+        <input type="text" id="wen" value="${esc(isEdit && word.en ? word.en : '')}">`}
       </div>
       <button class="btn btn-primary" type="submit">${isEdit ? 'Salva modifiche' : 'Aggiungi parola'}</button>
       ${isEdit ? `<button type="button" class="btn btn-danger" style="margin-top:10px" data-action="delete-word" data-word-id="${word.id}">Elimina parola</button>` : ''}
@@ -773,7 +786,7 @@ function viewImport(levelId) {
   return `
     ${backRow('Indietro', found ? '/level/' + found.level.id : '/add')}
     <div class="page-title">Importa parole</div>
-    <div class="page-sub">Una parola per riga: <code>tedesco;italiano</code> oppure <code>tedesco;italiano;inglese</code></div>
+    <div class="page-sub">Una parola per riga: <code>tedesco;italiano</code> oppure <code>tedesco;italiano;inglese</code>. Nei corsi solo inglese: <code>inglese;italiano</code></div>
     <form id="importForm">
       <div class="card">
         <label class="field-label" for="impCourse">Corso</label>
@@ -805,8 +818,10 @@ function searchResultsHtml(query) {
     return `<a class="word-row search-result" href="#/edit/word/${w.id}">
       <span class="stage-dot" data-lvl="${stageBucket(w.progress.stage)}"></span>
       <div class="word-row-main">
-        <div class="word-row-line"><span class="de">${esc(w.de)}</span></div>
-        ${hasLang(w, 'en') ? `<div class="word-row-line"><span class="en">${esc(w.en)}</span></div>` : ''}
+        ${hasLang(w, 'de')
+          ? `<div class="word-row-line"><span class="de">${esc(w.de)}</span></div>
+        ${hasLang(w, 'en') ? `<div class="word-row-line"><span class="en">${esc(w.en)}</span></div>` : ''}`
+          : `<div class="word-row-line"><span class="de">${esc(w.en)}</span></div>`}
         <div class="it">${esc(w.it)}</div>
         ${ctx ? `<div class="search-ctx">${ctx}</div>` : ''}
       </div>
@@ -909,9 +924,15 @@ function currentSessionItem() {
   return { word: STATE.words.find(w => w.id === entry.wordId), lang: entry.lang };
 }
 
+// Significati separati da ";" o ",": un distrattore non deve condividerne nessuno con la
+// risposta giusta (es. "fare" e "fare; creare" sarebbero entrambi corretti).
+function meaningsOf(s) { return String(s || '').toLowerCase().split(/[;,]/).map(t => t.trim()).filter(Boolean); }
+
 function distractorsFor(word, field, count) {
-  let pool = SESSION.pool.filter(w => w.id !== word.id && w[field] && w[field] !== word[field]);
-  if (pool.length < count) pool = STATE.words.filter(w => w.id !== word.id && w[field] && w[field] !== word[field]);
+  const correct = new Set(meaningsOf(word[field]));
+  const ok = w => w.id !== word.id && w[field] && w[field] !== word[field] && !meaningsOf(w[field]).some(t => correct.has(t));
+  let pool = SESSION.pool.filter(ok);
+  if (pool.length < count) pool = STATE.words.filter(ok);
   const chosen = sample(pool, count);
   const seen = new Set([word[field]]);
   const result = [];
@@ -941,8 +962,10 @@ function renderLearnPresentation(word, accentColor) {
     ${renderSessionProgress()}
     <div class="quiz-kicker">Nuova parola</div>
     <div class="learn-card accent-${accentColor}">
-      <div class="learn-de">${esc(word.de)}</div>
-      ${hasLang(word, 'en') ? `<div class="learn-en-big">${esc(word.en)}</div>` : ''}
+      ${hasLang(word, 'de')
+        ? `<div class="learn-de">${esc(word.de)}</div>
+      ${hasLang(word, 'en') ? `<div class="learn-en-big">${esc(word.en)}</div>` : ''}`
+        : `<div class="learn-de">${esc(word.en)}</div>`}
       <div class="learn-div"></div>
       <div class="learn-it">${esc(word.it)}</div>
     </div>
@@ -1064,7 +1087,7 @@ function renderSessionSummary() {
     </div>
     <div class="card">
       <div class="summary-stat"><span class="label">Parole in questa sessione</span><span class="val">${uniqueWords}</span></div>
-      <div class="summary-stat"><span class="label">Domande totali (DE + EN)</span><span class="val">${SESSION.total}</span></div>
+      <div class="summary-stat"><span class="label">Domande totali</span><span class="val">${SESSION.total}</span></div>
       <div class="summary-stat"><span class="label">Risposte corrette</span><span class="val" style="color:var(--good)">${SESSION.correct}</span></div>
       <div class="summary-stat"><span class="label">Risposte sbagliate</span><span class="val" style="color:var(--bad)">${SESSION.wrong}</span></div>
       <div class="summary-stat"><span class="label">Precisione</span><span class="val">${accuracy}%</span></div>
@@ -1237,10 +1260,11 @@ function attachHandlers(parts) {
   const wordForm = document.getElementById('wordForm');
   if (wordForm) wordForm.addEventListener('submit', e => {
     e.preventDefault();
-    const de = document.getElementById('wde').value.trim();
+    const enOnly = !!wordForm.dataset.enOnly;
+    const de = enOnly ? '' : document.getElementById('wde').value.trim();
     const it = document.getElementById('wit').value.trim();
     const en = document.getElementById('wen').value.trim();
-    if (!de || !it) return;
+    if ((!enOnly && !de) || !it || (enOnly && !en)) return;
     const wordId = wordForm.dataset.wordId;
     if (wordId) {
       const w = STATE.words.find(x => x.id === wordId);
@@ -1291,6 +1315,18 @@ function attachHandlers(parts) {
     let added = 0;
     lines.forEach(line => {
       const parts = line.split(/;|\t/).map(p => p.trim());
+      if (isEnOnlyCourse(found.course)) {
+        // corsi solo inglese: inglese;italiano (i significati multipli dell'italiano restano uniti)
+        if (parts.length >= 2 && parts[0] && parts[1]) {
+          STATE.words.push({
+            id: uid('w'), courseId: found.course.id, levelId,
+            de: '', en: parts[0], it: parts.slice(1).filter(Boolean).join('; '),
+            progress: freshProgress(),
+          });
+          added++;
+        }
+        return;
+      }
       if (parts.length >= 2 && parts[0] && parts[1]) {
         STATE.words.push({
           id: uid('w'), courseId: found.course.id, levelId,

@@ -22,6 +22,7 @@
   --green: #2E7D32;
   --pink: #C2185B;
   --orange: #E65100;
+  --sky: #0277BD;
 
   --good: #1E7A4C;
   --bad: #C43B26;
@@ -78,6 +79,7 @@ html[data-theme="dark"] {
 .accent-green  { --accent: var(--green); }
 .accent-pink   { --accent: var(--pink); }
 .accent-orange { --accent: var(--orange); }
+.accent-sky    { --accent: var(--sky); }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
