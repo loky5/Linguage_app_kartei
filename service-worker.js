@@ -8,7 +8,7 @@
 // continua a usare per sempre i file vecchi già salvati in cache, anche se sul
 // sito pubblicato i file sono già stati aggiornati.
 
-const CACHE_NAME = 'kartei-cache-v7';
+const CACHE_NAME = 'kartei-cache-v8';
 const ASSETS = [
   './',
   './index.html',
