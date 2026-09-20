@@ -115,7 +115,12 @@ function answersMatchOne(input, target) {
 
 // I campi possono contenere più alternative separate da virgola (es. traduzioni
 // italiane sinonime): basta indovinarne una.
+// Verbi inglesi con le tre forme ("to go, went, have gone"): va scritta la voce completa
+// (infinito, simple past e present perfect), quindi non si separano le virgole.
+function isVerbForms(target) { return /^to [^,;]+,[^,;]+,[^,;]+$/i.test(String(target || '').trim()); }
+
 function answersMatch(input, target) {
+  if (isVerbForms(target)) return answersMatchOne(input, target);
   return String(target || '').split(/[,;]/).some(alt => answersMatchOne(input, alt));
 }
 
@@ -179,7 +184,8 @@ function migrateState() {
 
 const SEED_VERSION = (typeof SEED_DATA !== 'undefined' && SEED_DATA.version) || 1;
 const isSeedCourseId = id => /^([se]\d+|c\d+-tedesco-.+)$/.test(id);
-const progressKey = w => (hasLang(w, 'de') ? wordKey(w.de) : 'en:' + wordKey(w.en));
+// Per i corsi solo inglese si usa l'infinito (i verbi hanno anche le altre forme).
+const progressKey = w => (hasLang(w, 'de') ? wordKey(w.de) : 'en:' + wordKey(String(w.en).split(',')[0]));
 
 // Quando i dati originali (Excel) vengono aggiornati, i corsi e le parole originali
 // vengono sostituiti dalla nuova versione. I progressi restano: ogni parola nuova
@@ -224,7 +230,7 @@ function upgradeSeedIfNeeded() {
     const info = oldLevelInfo.get(w.levelId);
     if (!info || customWords.some(x => x.id === w.id)) return;
     const nc = newCourseBySource.get(info.course.sourceName);
-    const nl = nc && nc.levels.find(l => l.name === info.level.name);
+    const nl = nc && (nc.levels.find(l => l.name === info.level.name) || nc.levels.find(l => l.order === info.level.order) || nc.levels[nc.levels.length - 1]);
     if (nl) customWords.push({ ...w, courseId: nc.id, levelId: nl.id });
   });
 
