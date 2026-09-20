@@ -589,7 +589,7 @@ function viewCourse(courseId) {
 }
 
 function colorVar(color) {
-  const map = { blue: 'blue', red: 'red', gold: 'gold', teal: 'teal', violet: 'violet', green: 'green', pink: 'pink' };
+  const map = { blue: 'blue', red: 'red', gold: 'gold', teal: 'teal', violet: 'violet', green: 'green', pink: 'pink', orange: 'orange' };
   return map[color] || 'navy';
 }
 
@@ -699,7 +699,7 @@ function viewAddMenu() {
 }
 
 function viewCourseForm() {
-  const colors = ['blue', 'red', 'gold', 'teal', 'violet', 'green', 'pink'];
+  const colors = ['blue', 'red', 'gold', 'teal', 'violet', 'green', 'pink', 'orange'];
   return `
     ${backRow('Aggiungi', '/add')}
     <div class="page-title">Nuovo corso</div>

@@ -21,6 +21,7 @@
   --violet: #6231B0;
   --green: #2E7D32;
   --pink: #C2185B;
+  --orange: #E65100;
 
   --good: #1E7A4C;
   --bad: #C43B26;
@@ -76,6 +77,7 @@ html[data-theme="dark"] {
 .accent-violet { --accent: var(--violet); }
 .accent-green  { --accent: var(--green); }
 .accent-pink   { --accent: var(--pink); }
+.accent-orange { --accent: var(--orange); }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 

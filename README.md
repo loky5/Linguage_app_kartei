@@ -1,8 +1,8 @@
 # Kartei — le tue parole
 
 Un'app web offline per imparare vocabolario con la ripetizione dilazionata,
-costruita a partire dal tuo file Excel "parole memrise ted-eng-ita" (3.436
-parole già importate, in 7 corsi tedeschi con i loro livelli, nello stesso
+costruita a partire dal tuo file Excel "parole memrise ted-eng-ita" (3.461
+parole già importate, in 8 corsi tedeschi con i loro livelli, nello stesso
 ordine del file). Nessun account, nessun server, nessuna
 dipendenza da Memrise: tutti i dati restano sul tuo iPhone.
 
@@ -116,7 +116,7 @@ kartei/
 ├── app.js                logica dell'app (dati, algoritmo, schermate)
 ├── manifest.json          configurazione PWA (nome, icone, colori)
 ├── service-worker.js       cache offline
-├── data/seed-data.js        le tue 3.436 parole originali, importate dall'Excel
+├── data/seed-data.js        le tue 3.461 parole originali, importate dall'Excel
 └── icons/                    icone dell'app
 ```
 
